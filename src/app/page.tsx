@@ -100,19 +100,25 @@ export default function Home() {
 
       {/* 上部ボタンバー（Canvasの外） */}
       <div className="absolute top-0 left-0 w-full flex gap-2 p-2 bg-white/20">
+        {/* 
         <button
           onClick={() => triggerMotion("running")}
           className="px-4 py-2 bg-blue-500 text-white rounded shadow"
         >
           走る
         </button>
+        
+
         <button
           onClick={() => triggerMotion("neutral")}
           className="px-4 py-2 bg-green-500 text-white rounded shadow"
         >
           Idle
         </button>
+        */}
       </div>
+
+      
 
       {/* チャットUI（Canvasの外） */}
       <div className="absolute bottom-0 left-0 w-full h-1/3 bg-white/20 flex flex-col border-t">

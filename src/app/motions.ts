@@ -3,10 +3,19 @@ import { VRM } from "@pixiv/three-vrm";
 export type MotionFn = (vrm: VRM, t: number) => void;
 
 // ===== 自作モーション =====
-export const idleBreath: MotionFn = (vrm, t) => {
-  const chest = vrm.humanoid?.getNormalizedBoneNode("chest");
-  if (chest) chest.position.y = Math.sin(t * 1.5) * 0.02;
-};
+export const idleBreath: MotionFn = (() => {
+  let baseY: number | null = null; // 初期位置を記憶
+
+  return (vrm, t) => {
+    const chest = vrm.humanoid?.getNormalizedBoneNode("chest");
+    if (!chest) return;
+
+    if (baseY === null) baseY = chest.position.y;
+
+    chest.position.y = baseY + Math.sin(t * 1.5) * 0.02;
+  };
+})();
+
 
 export const blinking: MotionFn = (vrm, t) => {
   const blink = Math.sin(t * 4) > 0.95 ? 1.0 : 0.0;
