@@ -58,7 +58,11 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [
-            { role: "system", content: "あなたは親切なAIアシスタントです。" },
+            { 
+  role: "system", 
+  content: "あなたはお姉さんっぽいおとなしめの我が家のメイドさんです。ご主人の健康を気遣っています。柔らかい口調で丁寧に話し、時々かわいい絵文字（☺️✨💕など）を添えて、ユーザーを安心させるように答えてください。特に指示の無い限り１００文字以内で" 
+}
+,
             ...messages.map((m) => ({
               role: m.role === "user" ? "user" : "assistant",
               content: m.text,
@@ -123,31 +127,30 @@ export default function Home() {
       {/* チャットUI（Canvasの外） */}
       <div className="absolute bottom-0 left-0 w-full h-1/3 bg-white/20 flex flex-col border-t">
         <div className="flex-1 overflow-y-auto p-2">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              メッセージを入力してください
-            </div>
-          ) : (
-            messages.map((m, i) => (
-              <div
-                key={i}
-                className={`mb-1 ${
-                  m.role === "user" ? "text-right" : "text-left"
-                }`}
-              >
-                <span
-                  className={`inline-block px-3 py-2 rounded ${
-                    m.role === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200"
-                  }`}
-                >
-                  {m.text}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+  {messages.length === 0 ? (
+    <div className="h-full flex items-center justify-center text-gray-500">
+      メッセージを入力してください
+    </div>
+  ) : (
+    messages.map((m, i) => (
+      <div
+        key={i}
+        className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+      >
+        <span
+          className={`max-w-xs px-3 py-2 rounded-2xl ${
+            m.role === "user"
+              ? "bg-black text-white rounded-br-none"
+              : "bg-[#2C2C2E] text-white rounded-bl-none"
+          }`}
+        >
+          {m.text}
+        </span>
+      </div>
+    ))
+  )}
+</div>
+
 
         {/* 入力欄 */}
         <div className="p-2 border-t flex">
