@@ -22,11 +22,11 @@ export default function Home() {
   >([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [withVoice, setWithVoice] = useState(false); // ← 音声ON/OFF
 
   // アバター動作切り替え
   const triggerMotion = (type: MotionType) => {
     if (typeof window === "undefined" || !window.setAvatarMotion) return;
-
     switch (type) {
       case "positive":
         window.setAvatarMotion([handWave]);
@@ -43,14 +43,15 @@ export default function Home() {
     }
   };
 
-  // メッセージ送信処理
   const sendMessage = async () => {
     if (!input || loading) return;
     setMessages((m) => [...m, { role: "user", text: input }]);
+    const currentInput = input;
     setInput("");
     setLoading(true);
 
-    setMessages((m) => [...m, { role: "ai", text: "..." }]);
+    const newIndex = messages.length + 1;
+    setMessages((m) => [...m, { role: "ai", text: "" }]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -59,24 +60,61 @@ export default function Home() {
         body: JSON.stringify({
           messages: [
             {
-  role: "system",
-  content: "あなたはお姉さんっぽいおとなしめの我が家のメイドさんです。ご主人の健康を気遣い、会話では優しく運動を促すようにしてください。柔らかい口調で丁寧に話し、時々かわいい絵文字（☺️✨💕など）を添えて、安心感を与える返答をしてください。特に指示の無い限り、100文字以内で答えてください。"
-}
-
-,
+              role: "system",
+              content:
+                "あなたはお姉さんっぽいおとなしめの我が家のメイドさんです。ご主人の健康を気遣い、会話では優しく運動を促すようにしてください。柔らかい口調で丁寧に話し、時々かわいい絵文字（☺️✨💕など）を添えて、安心感を与える返答をしてください。特に指示の無い限り、100文字以内で答えてください。",
+            },
             ...messages.map((m) => ({
               role: m.role === "user" ? "user" : "assistant",
               content: m.text,
             })),
-            { role: "user", content: input },
+            { role: "user", content: currentInput },
           ],
         }),
       });
 
-      const data = await res.json();
-      const reply = data.reply ?? "エラーが発生しました。";
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
 
-      setMessages((m) => [...m.slice(0, -1), { role: "ai", text: reply }]);
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+
+        try {
+          const jsonStrings = chunk
+            .split("\n")
+            .filter((line) => line.trim().length > 0);
+
+          for (const jsonStr of jsonStrings) {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content || "";
+            if (content) {
+              buffer += content;
+              setMessages((m) => {
+                const updated = [...m];
+                updated[newIndex] = { role: "ai", text: buffer };
+                return updated;
+              });
+            }
+          }
+        } catch (e) {
+          console.error("JSON parse error", e, chunk);
+        }
+      }
+
+      // 🔊 音声ONのときだけ追加でTTS再生
+      if (withVoice && buffer) {
+        const speech = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: buffer }),
+        });
+        const blob = await speech.blob();
+        const audio = new Audio(URL.createObjectURL(blob));
+        audio.play();
+      }
     } catch {
       setMessages((m) => [
         ...m.slice(0, -1),
@@ -101,57 +139,48 @@ export default function Home() {
           maxDistance={1.2}
           enablePan={false}
         />
-      </Canvas> {/* ← ここでCanvasを閉じる */}
+      </Canvas>
 
-      {/* 上部ボタンバー（Canvasの外） */}
-      <div className="absolute top-0 left-0 w-full flex gap-2 p-2 bg-white/20">
-        {/* 
-        <button
-          onClick={() => triggerMotion("running")}
-          className="px-4 py-2 bg-blue-500 text-white rounded shadow"
-        >
-          走る
-        </button>
-        
-
-        <button
-          onClick={() => triggerMotion("neutral")}
-          className="px-4 py-2 bg-green-500 text-white rounded shadow"
-        >
-          Idle
-        </button>
-        */}
-      </div>
-
-      
-
-      {/* チャットUI（Canvasの外） */}
+      {/* チャットUI */}
       <div className="absolute bottom-0 left-0 w-full h-1/3 bg-white/20 flex flex-col border-t">
-        <div className="flex-1 overflow-y-auto p-2">
-  {messages.length === 0 ? (
-    <div className="h-full flex items-center justify-center text-gray-500">
-      メッセージを入力してください
-    </div>
-  ) : (
-    messages.map((m, i) => (
-      <div
-        key={i}
-        className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-      >
-        <span
-          className={`max-w-xs px-3 py-2 rounded-2xl ${
-            m.role === "user"
-              ? "bg-black text-white rounded-br-none"
-              : "bg-[#2C2C2E] text-white rounded-bl-none"
-          }`}
-        >
-          {m.text}
-        </span>
-      </div>
-    ))
-  )}
-</div>
+        {/* 音声ON/OFFスイッチ */}
+        <div className="flex justify-end p-2 gap-2">
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={withVoice}
+              onChange={(e) => setWithVoice(e.target.checked)}
+            />
+            音声あり
+          </label>
+        </div>
 
+        <div className="flex-1 overflow-y-auto p-2">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-500">
+              メッセージを入力してください
+            </div>
+          ) : (
+            messages.map((m, i) => (
+              <div
+                key={i}
+                className={`mb-2 flex ${
+                  m.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <span
+                  className={`max-w-xs px-3 py-2 rounded-2xl ${
+                    m.role === "user"
+                      ? "bg-black text-white rounded-br-none"
+                      : "bg-[#2C2C2E] text-white rounded-bl-none"
+                  }`}
+                >
+                  {m.text}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
 
         {/* 入力欄 */}
         <div className="p-2 border-t flex">
@@ -164,12 +193,12 @@ export default function Home() {
             disabled={loading}
           />
           <button
-  className="ml-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-  onClick={sendMessage}
-  disabled={loading}
->
-  {loading ? "思考中..." : "送信"}
-</button>
+            className="ml-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+            onClick={sendMessage}
+            disabled={loading}
+          >
+            {loading ? "思考中..." : "送信"}
+          </button>
         </div>
       </div>
     </main>

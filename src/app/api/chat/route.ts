@@ -1,19 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { NextRequest } from "next/server";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json();
+  try {
+    const { messages } = await req.json();
 
-  const completion = await client.chat.completions.create({
-    model: "gpt-5-mini", // 軽量で高速な会話用
-    messages,            // ユーザーとAIのやりとりを渡す
-  });
+    const stream = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      stream: true,
+    });
 
-  return NextResponse.json({
-    reply: completion.choices[0].message.content,
-  });
+    return new Response(stream.toReadableStream(), {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    console.error("API Error:", err);
+    return new Response(JSON.stringify({ error: "OpenAI API error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
